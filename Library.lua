@@ -283,7 +283,7 @@ local Library = {
     -- notification --
     Notify = nil;
     NotifySide = "Left";
-    ShowCustomCursor = true;
+    ShowCustomCursor = false;
     ShowToggleFrameInKeybinds = true;
     NotifyOnError = false; -- true = Library:Notify for SafeCallback (still warns in the developer console)
 
@@ -1131,7 +1131,7 @@ local Templates = { -- TO-DO: do it for missing elements.
         TabPadding = 1,
         MenuFadeTime = 0.2,
         NotifySide = "Left",
-        ShowCustomCursor = true,
+        ShowCustomCursor = false,
         UnlockMouseWhileOpen = true,
         Center = false
     },
@@ -1688,7 +1688,7 @@ do
                 KeyPicker.Value = "Unknown"
             end
 
-            KeyPicker.Modifiers = VerifyModifiers(if typeof(Modifiers) == "table" then Modifiers else KeyPicker.Modifiers)
+            KeyPicker.Modifiers = Info.NoModifiers and {} or VerifyModifiers(if typeof(Modifiers) == "table" then Modifiers else KeyPicker.Modifiers)
             KeyPicker.DisplayValue = if GetTableSize(KeyPicker.Modifiers) > 0 then (table.concat(KeyPicker.Modifiers, " + ") .. " + " .. KeyPicker.Value) else KeyPicker.Value
 
             DisplayLabel.Text = KeyPicker.DisplayValue
@@ -7910,7 +7910,7 @@ end
             -- A bit scuffed, but if we're going from not toggled -> toggled we want to show the frame immediately so that the fade is visible.
             Outer.Visible = true
 
-            if DrawingLib.drawing_replaced ~= true and IsBadDrawingLib ~= true then
+            if Library.ShowCustomCursor and DrawingLib.drawing_replaced ~= true and IsBadDrawingLib ~= true then
                 IsBadDrawingLib = not (pcall(function()
                     local Cursor = DrawingLib.new("Triangle")
                     Cursor.Thickness = 1
@@ -8012,17 +8012,29 @@ end
         return Window:Toggle(Toggling)
     end
 
+    local function IsToggleKey(Input)
+        if Input.UserInputType ~= Enum.UserInputType.Keyboard then
+            return false
+        end
+        local Keybind = Library.ToggleKeybind
+        if typeof(Keybind) == "table" and Keybind.Type == "KeyPicker" then
+            return Input.KeyCode.Name == Keybind.Value
+        end
+        if typeof(Keybind) == "EnumItem" then
+            return Input.KeyCode == Keybind
+        end
+        if typeof(Keybind) == "string" then
+            return Input.KeyCode.Name == Keybind
+        end
+        return Input.KeyCode == Enum.KeyCode.RightControl
+    end
+
     Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed) -- :sob:
-        if Library.Unloaded then
+        if Library.Unloaded or Processed then
             return
         end
-        
-        if typeof(Library.ToggleKeybind) == "table" and Library.ToggleKeybind.Type == "KeyPicker" then
-            if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind.Value then
-                task.spawn(Library.Toggle)
-            end
 
-        elseif Input.KeyCode == Enum.KeyCode.RightControl or (Input.KeyCode == Enum.KeyCode.RightShift and (not Processed)) then
+        if IsToggleKey(Input) then
             task.spawn(Library.Toggle)
         end
     end))
